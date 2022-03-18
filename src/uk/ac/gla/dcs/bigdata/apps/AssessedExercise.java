@@ -17,6 +17,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 
 import uk.ac.gla.dcs.bigdata.providedfunctions.NewsFormaterMap;
@@ -132,17 +133,17 @@ public class AssessedExercise {
 		List<Query> queryList = queries.collectAsList();
 		
 		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
-		LongAccumulator totalTermFrequencyInCorpusAcc = spark.sparkContext().longAccumulator();
+		LongAccumulator totalDocumentLengthInCorpus = spark.sparkContext().longAccumulator();
 		LongAccumulator totalDocsInCorpusAcc = spark.sparkContext().longAccumulator();
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
 
-		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc), Encoders.bean(NewsArticle.class));
+		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpus), Encoders.bean(NewsArticle.class));
 
 		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
 		long sumDocsInCorpus = totalDocsInCorpusAcc.value();
-		
+		double averageDocumentLengthInCorpus = totalDocumentLengthInCorpus.value() / totalDocsInCorpusAcc.value();
 		//Broadcast<Set<String>> broadcastCurrentDocumentLength = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(stopwords);
 
 		// collect some articles
