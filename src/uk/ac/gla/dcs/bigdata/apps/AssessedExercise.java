@@ -1,7 +1,14 @@
 package uk.ac.gla.dcs.bigdata.apps;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
@@ -13,6 +20,8 @@ import uk.ac.gla.dcs.bigdata.providedfunctions.QueryFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedstructures.DocumentRanking;
 import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
 import uk.ac.gla.dcs.bigdata.providedstructures.Query;
+import uk.ac.gla.dcs.bigdata.providedstructures.RankedResult;
+import uk.ac.gla.dcs.bigdata.studentfunctions.TestTokenize;
 
 /**
  * This is the main class where your Spark topology should be specified.
@@ -28,13 +37,16 @@ public class AssessedExercise {
 	
 	public static void main(String[] args) {
 		
-		File hadoopDIR = new File("resources/hadoop/"); // represent the hadoop directory as a Java file so we can get an absolute path for it
-		System.setProperty("hadoop.home.dir", hadoopDIR.getAbsolutePath()); // set the JVM system property so that Spark finds it
+		
 		
 		// The code submitted for the assessed exerise may be run in either local or remote modes
 		// Configuration of this will be performed based on an environment variable
-		String sparkMasterDef = System.getenv("spark.master");
-		if (sparkMasterDef==null) sparkMasterDef = "local[2]"; // default is local mode with two executors
+		String sparkMasterDef = System.getenv("SPARK_MASTER");
+		if (sparkMasterDef==null) {
+			File hadoopDIR = new File("resources/hadoop/"); // represent the hadoop directory as a Java file so we can get an absolute path for it
+			System.setProperty("hadoop.home.dir", hadoopDIR.getAbsolutePath()); // set the JVM system property so that Spark finds it
+			sparkMasterDef = "local[2]"; // default is local mode with two executors
+		}
 		
 		String sparkSessionName = "BigDataAE"; // give the session a name
 		
@@ -51,11 +63,11 @@ public class AssessedExercise {
 	
 		
 		// Get the location of the input queries
-		String queryFile = System.getenv("bigdata.queries");
+		String queryFile = System.getenv("BIGDATA_QUERIES");
 		if (queryFile==null) queryFile = "data/queries.list"; // default is a sample with 3 queries
 		
 		// Get the location of the input news articles
-		String newsFile = System.getenv("bigdata.news");
+		String newsFile = System.getenv("BIGDATA_NEWS");
 		if (newsFile==null) newsFile = "data/TREC_Washington_Post_collection.v3.example.json"; // default is a sample of 5000 news articles
 		
 		// Call the student's code
@@ -64,20 +76,28 @@ public class AssessedExercise {
 		// Close the spark session
 		spark.close();
 		
+		String out = System.getenv("BIGDATA_RESULTS");
+		String resultsDIR = "results/";
+		if (out!=null) resultsDIR = out;
+		
 		// Check if the code returned any results
 		if (results==null) System.err.println("Topology return no rankings, student code may not be implemented, skiping final write.");
 		else {
 			
-			// We have set of output rankings, lets write to disk
-			
-			// Create a new folder 
-			File outDirectory = new File("results/"+System.currentTimeMillis());
-			if (!outDirectory.exists()) outDirectory.mkdir();
-			
 			// Write the ranking for each query as a new file
 			for (DocumentRanking rankingForQuery : results) {
-				rankingForQuery.write(outDirectory.getAbsolutePath());
+				rankingForQuery.write(new File(resultsDIR).getAbsolutePath());
 			}
+		}
+		
+		try {
+			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File(resultsDIR).getAbsolutePath()+"/SPARK.DONE")));
+			writer.write(String.valueOf(System.currentTimeMillis()));
+			writer.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		
 		
@@ -91,6 +111,8 @@ public class AssessedExercise {
 		Dataset<Row> queriesjson = spark.read().text(queryFile);
 		Dataset<Row> newsjson = spark.read().text(newsFile); // read in files as string rows, one row per article
 		
+		newsjson = newsjson.repartition(24);
+		
 		// Perform an initial conversion from Dataset<Row> to Query and NewsArticle Java objects
 		Dataset<Query> queries = queriesjson.map(new QueryFormaterMap(), Encoders.bean(Query.class)); // this converts each row into a Query
 		Dataset<NewsArticle> news = newsjson.map(new NewsFormaterMap(), Encoders.bean(NewsArticle.class)); // this converts each row into a NewsArticle
@@ -99,8 +121,29 @@ public class AssessedExercise {
 		// Your Spark Topology should be defined here
 		//----------------------------------------------------------------
 		
+		// try a collect as list
+		List<Query> queryList = queries.collectAsList();
 		
-		return null; // replace this with the the list of DocumentRanking output by your topology
+		// try a map function
+		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
+		
+		// collect some articles
+		List<NewsArticle> first10 = newsTokenized.takeAsList(10);
+		
+		// create a dummy document ranking manually so we can return something
+		List<RankedResult> results = new ArrayList<RankedResult>(10);
+		for (NewsArticle article : first10) {
+			RankedResult result = new RankedResult(article.getId(), article, 1.0);
+			results.add(result);
+			
+		}
+		DocumentRanking ranking = new DocumentRanking(queryList.get(0), results);
+		
+		// convert to list
+		List<DocumentRanking> rankingList = new ArrayList<DocumentRanking>(1);
+		rankingList.add(ranking);
+		
+		return rankingList; // replace this with the the list of DocumentRanking output by your topology
 	}
 	
 	
