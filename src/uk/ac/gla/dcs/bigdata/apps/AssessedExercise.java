@@ -135,6 +135,7 @@ public class AssessedExercise {
 		LongAccumulator totalDocumentLengthInCorpusAcc = spark.sparkContext().longAccumulator();
 		LongAccumulator totalDocsInCorpusAcc = spark.sparkContext().longAccumulator();
 		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
+		LongAccumulator totalTermFrequencyInCorpusAcc = spark.sparkContext().longAccumulator();
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
@@ -149,8 +150,7 @@ public class AssessedExercise {
 		Broadcast<List<Query>> queryBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(queryList);
 		
 		Dataset<NewsArticleQueriesMap> newsArticlesQueriesMap = newsTokenized.map(new NewsArticleQueriesMapper(queryBroadcast, termFrequencyInCurrentDocumentAcc), Encoders.bean(NewsArticleQueriesMap.class));
-		List<NewsArticleQueriesMap> f = newsArticlesQueriesMap.collectAsList();
-		List<NewsArticleQueriesMap> f2 = newsArticlesQueriesMap.takeAsList(10);
+		List<NewsArticleQueriesMap> newsArticlesQueriesMapList = newsArticlesQueriesMap.collectAsList();
 		
 		
 		// collect some articles

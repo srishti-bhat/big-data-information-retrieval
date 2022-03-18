@@ -37,6 +37,7 @@ public class NewsArticleQueriesMapper implements MapFunction<NewsArticle, NewsAr
         /*newsArticle.getContents().forEach(content-> {
             String processedContent = terms2String(processor.process(content.getContent()));
         }); */
+        
         List<String> queryTermsFlattened = new ArrayList<String>();
         Map<String,Long> termFreq = new HashMap<String,Long>();
 
