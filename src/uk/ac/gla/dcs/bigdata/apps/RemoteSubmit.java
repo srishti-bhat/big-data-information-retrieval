@@ -21,8 +21,8 @@ public class RemoteSubmit {
 		
 		
 		args = new String[] {
-				"remote", // Change this to your teamid
-				"test"    // Change this to your project
+				"3titans", // Change this to your teamid
+				"big-data-assessed-exercise"    // Change this to your project
 			};
 		
 		if (args.length!=2 || args[0].equalsIgnoreCase("TODO")) {
