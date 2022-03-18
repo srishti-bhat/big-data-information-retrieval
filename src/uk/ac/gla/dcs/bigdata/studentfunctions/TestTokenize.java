@@ -7,6 +7,7 @@ import org.apache.spark.api.java.function.MapFunction;
 import uk.ac.gla.dcs.bigdata.providedstructures.ContentItem;
 import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
 import uk.ac.gla.dcs.bigdata.providedutilities.TextPreProcessor;
+import org.apache.spark.util.LongAccumulator;
 
 /**
  * Testing map class that simply applies the text pre-processor on all text
@@ -18,7 +19,7 @@ public class TestTokenize implements MapFunction<NewsArticle,NewsArticle> {
 	private static final long serialVersionUID = 4638169702466249304L;
 	
 	private transient TextPreProcessor processor;
-	
+
 	/**
 	 * Called for each news article, applies the text pre-processor on all text in the article
 	 */
@@ -37,7 +38,6 @@ public class TestTokenize implements MapFunction<NewsArticle,NewsArticle> {
 				content.setContent(processedContent);
 			}
 		}
-		
 		return article;
 	}
 	

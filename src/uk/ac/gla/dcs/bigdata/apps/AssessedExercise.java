@@ -8,12 +8,16 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.util.LongAccumulator;
 
 import uk.ac.gla.dcs.bigdata.providedfunctions.NewsFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedfunctions.QueryFormaterMap;
@@ -21,6 +25,7 @@ import uk.ac.gla.dcs.bigdata.providedstructures.DocumentRanking;
 import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
 import uk.ac.gla.dcs.bigdata.providedstructures.Query;
 import uk.ac.gla.dcs.bigdata.providedstructures.RankedResult;
+import uk.ac.gla.dcs.bigdata.studentfunctions.DocumentIterator;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TestTokenize;
 
 /**
@@ -73,6 +78,8 @@ public class AssessedExercise {
 		// Call the student's code
 		List<DocumentRanking> results = rankDocuments(spark, queryFile, newsFile);
 		
+		System.out.println(results.size());
+
 		// Close the spark session
 		spark.close();
 		
@@ -124,9 +131,20 @@ public class AssessedExercise {
 		// try a collect as list
 		List<Query> queryList = queries.collectAsList();
 		
+		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
+		LongAccumulator totalTermFrequencyInCorpusAcc = spark.sparkContext().longAccumulator();
+		LongAccumulator totalDocsInCorpusAcc = spark.sparkContext().longAccumulator();
+
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
+
+		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc), Encoders.bean(NewsArticle.class));
+
+		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
+		long sumDocsInCorpus = totalDocsInCorpusAcc.value();
 		
+		//Broadcast<Set<String>> broadcastCurrentDocumentLength = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(stopwords);
+
 		// collect some articles
 		List<NewsArticle> first10 = newsTokenized.takeAsList(10);
 		
@@ -134,8 +152,7 @@ public class AssessedExercise {
 		List<RankedResult> results = new ArrayList<RankedResult>(10);
 		for (NewsArticle article : first10) {
 			RankedResult result = new RankedResult(article.getId(), article, 1.0);
-			results.add(result);
-			
+			results.add(result);	
 		}
 		DocumentRanking ranking = new DocumentRanking(queryList.get(0), results);
 		
