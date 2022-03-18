@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -17,7 +16,6 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 
 import uk.ac.gla.dcs.bigdata.providedfunctions.NewsFormaterMap;
@@ -27,7 +25,9 @@ import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
 import uk.ac.gla.dcs.bigdata.providedstructures.Query;
 import uk.ac.gla.dcs.bigdata.providedstructures.RankedResult;
 import uk.ac.gla.dcs.bigdata.studentfunctions.DocumentIterator;
+import uk.ac.gla.dcs.bigdata.studentfunctions.NewsArticleQueriesMapper;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TestTokenize;
+import uk.ac.gla.dcs.bigdata.studentstructures.NewsArticleQueriesMap;
 
 /**
  * This is the main class where your Spark topology should be specified.
@@ -134,11 +134,12 @@ public class AssessedExercise {
 		
 		LongAccumulator totalDocumentLengthInCorpusAcc = spark.sparkContext().longAccumulator();
 		LongAccumulator totalDocsInCorpusAcc = spark.sparkContext().longAccumulator();
+		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
 
-		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpusAcc), Encoders.bean(NewsArticle.class));
+		Dataset<NewsArticle> newsArticles = newsTokenized.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpusAcc), Encoders.bean(NewsArticle.class));
 
 
 		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
@@ -146,6 +147,11 @@ public class AssessedExercise {
 		double averageDocumentLengthInCorpus = totalDocumentLengthInCorpusAcc.value() / (1.0 * totalDocsInCorpusAcc.value());
 
 		Broadcast<List<Query>> queryBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(queryList);
+		
+		Dataset<NewsArticleQueriesMap> newsArticlesQueriesMap = newsTokenized.map(new NewsArticleQueriesMapper(queryBroadcast, termFrequencyInCurrentDocumentAcc), Encoders.bean(NewsArticleQueriesMap.class));
+		List<NewsArticleQueriesMap> f = newsArticlesQueriesMap.collectAsList();
+		List<NewsArticleQueriesMap> f2 = newsArticlesQueriesMap.takeAsList(10);
+		
 		
 		// collect some articles
 		List<NewsArticle> first10 = newsTokenized.takeAsList(10);

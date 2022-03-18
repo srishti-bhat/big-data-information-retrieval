@@ -26,6 +26,8 @@ public class DocumentIterator implements FlatMapFunction<NewsArticle, NewsArticl
     @Override
     public Iterator<NewsArticle> call(NewsArticle newsArticle) throws Exception {
 
+        if (processor==null) processor = new TextPreProcessor();
+
         newsArticle.getContents().forEach(content -> {
             if (content.getContent()!=null) {
 				String processedContent = terms2String(processor.process(content.getContent()));
