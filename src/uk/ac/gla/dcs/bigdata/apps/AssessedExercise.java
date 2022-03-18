@@ -120,7 +120,7 @@ public class AssessedExercise {
 		Dataset<Row> newsjson = spark.read().text(newsFile); // read in files as string rows, one row per article
 		
 		newsjson = newsjson.repartition(24);
-		
+
 		// Perform an initial conversion from Dataset<Row> to Query and NewsArticle Java objects
 		Dataset<Query> queries = queriesjson.map(new QueryFormaterMap(), Encoders.bean(Query.class)); // this converts each row into a Query
 		Dataset<NewsArticle> news = newsjson.map(new NewsFormaterMap(), Encoders.bean(NewsArticle.class)); // this converts each row into a NewsArticle
@@ -132,20 +132,21 @@ public class AssessedExercise {
 		// try a collect as list
 		List<Query> queryList = queries.collectAsList();
 		
-		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
-		LongAccumulator totalDocumentLengthInCorpus = spark.sparkContext().longAccumulator();
+		LongAccumulator totalDocumentLengthInCorpusAcc = spark.sparkContext().longAccumulator();
 		LongAccumulator totalDocsInCorpusAcc = spark.sparkContext().longAccumulator();
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
 
-		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpus), Encoders.bean(NewsArticle.class));
+		Dataset<NewsArticle> newsArticles = news.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpusAcc), Encoders.bean(NewsArticle.class));
+
 
 		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
 		long sumDocsInCorpus = totalDocsInCorpusAcc.value();
-		double averageDocumentLengthInCorpus = totalDocumentLengthInCorpus.value() / totalDocsInCorpusAcc.value();
-		//Broadcast<Set<String>> broadcastCurrentDocumentLength = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(stopwords);
+		double averageDocumentLengthInCorpus = totalDocumentLengthInCorpusAcc.value() / (1.0 * totalDocsInCorpusAcc.value());
 
+		Broadcast<List<Query>> queryBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(queryList);
+		
 		// collect some articles
 		List<NewsArticle> first10 = newsTokenized.takeAsList(10);
 		

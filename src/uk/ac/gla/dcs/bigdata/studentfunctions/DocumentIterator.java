@@ -8,16 +8,19 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.util.LongAccumulator;
 
 import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
+import uk.ac.gla.dcs.bigdata.providedutilities.TextPreProcessor;
 
 public class DocumentIterator implements FlatMapFunction<NewsArticle, NewsArticle>{
 
 	LongAccumulator totalDocsInCorpusAcc;
-    LongAccumulator totalDocumentLengthInCorpus;
+    LongAccumulator totalDocumentLengthInCorpusAcc;
+	
+    private transient TextPreProcessor processor;
 
-	public DocumentIterator(LongAccumulator totalDocsInCorpusAcc, LongAccumulator totalDocumentLengthInCorpus) {
+	public DocumentIterator(LongAccumulator totalDocsInCorpusAcc, LongAccumulator totalDocumentLengthInCorpusAcc) {
         super();
 		this.totalDocsInCorpusAcc = totalDocsInCorpusAcc;
-        this.totalDocumentLengthInCorpus = totalDocumentLengthInCorpus;
+        this.totalDocumentLengthInCorpusAcc = totalDocumentLengthInCorpusAcc;
 	}
 	
     @Override
@@ -25,8 +28,11 @@ public class DocumentIterator implements FlatMapFunction<NewsArticle, NewsArticl
 
         newsArticle.getContents().forEach(content -> {
             if (content.getContent()!=null) {
-                totalDocumentLengthInCorpus.add(content.getContent().length());
-            }
+				String processedContent = terms2String(processor.process(content.getContent()));
+				if(processedContent != null){
+                    totalDocumentLengthInCorpusAcc.add(processedContent.length());
+                }
+			}
         });
         
         totalDocsInCorpusAcc.add(1);
@@ -38,5 +44,17 @@ public class DocumentIterator implements FlatMapFunction<NewsArticle, NewsArticl
         return newsArticles.iterator();
     }
 
-    
+    /**
+	 * Utility method that converts a List<String> to a string
+	 * @param terms
+	 * @return
+	 */
+	public String terms2String(List<String> terms) {
+		StringBuilder builder = new StringBuilder();
+		for (String term : terms) {
+			builder.append(term);
+			builder.append(" ");
+		}
+		return builder.toString();
+	}
 }
