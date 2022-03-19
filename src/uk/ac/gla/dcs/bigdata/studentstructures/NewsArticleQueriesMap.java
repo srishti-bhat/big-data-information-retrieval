@@ -12,13 +12,11 @@ public class NewsArticleQueriesMap implements Serializable {
     private static final long serialVersionUID = 1565312130567946299L;
 
     NewsArticle newsArticle; 
-	List<Query> queryList; 
-    Map<String, Long> queryTermFrequencyMap;
+    Map<String, Short> queryTermFrequencyMap;
 
-    public NewsArticleQueriesMap(NewsArticle newsArticle, List<Query> queryList,
-            Map<String, Long> queryTermFrequencyMap) {
+    public NewsArticleQueriesMap(NewsArticle newsArticle, Map<String, Short> queryTermFrequencyMap) {
+        super();
         this.newsArticle = newsArticle;
-        this.queryList = queryList;
         this.queryTermFrequencyMap = queryTermFrequencyMap;
     }
 
@@ -26,28 +24,26 @@ public class NewsArticleQueriesMap implements Serializable {
     public NewsArticleQueriesMap() {
     }
 
-    
+
     public NewsArticle getNewsArticle() {
         return newsArticle;
     }
 
-    public List<Query> getQueryList() {
-        return queryList;
-    }
 
-    public void setQueryList(List<Query> queryList) {
-        this.queryList = queryList;
+    public void setNewsArticle(NewsArticle newsArticle) {
+        this.newsArticle = newsArticle;
     }
 
 
-    public Map<String, Long> getQueryTermFrequencyMap() {
+    public Map<String, Short> getQueryTermFrequencyMap() {
         return queryTermFrequencyMap;
     }
 
 
-    public void setQueryTermFrequencyMap(Map<String, Long> queryTermFrequencyMap) {
+    public void setQueryTermFrequencyMap(Map<String, Short> queryTermFrequencyMap) {
         this.queryTermFrequencyMap = queryTermFrequencyMap;
     }
+
 
 
 }

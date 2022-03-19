@@ -20,7 +20,7 @@ public class TermFrequencyMapper implements FlatMapFunction<NewsArticleQueriesMa
         for (Map.Entry entry: newsArticleQueriesMap.getQueryTermFrequencyMap().entrySet())
             termFrequencyList.add(
                 new TermFrequency(
-                    entry.getKey().toString(), (Long)entry.getValue()
+                    entry.getKey().toString(), Long.parseLong(entry.getValue().toString())
                     )
                 );
        

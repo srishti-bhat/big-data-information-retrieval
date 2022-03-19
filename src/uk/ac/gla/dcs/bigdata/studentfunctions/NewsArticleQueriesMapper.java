@@ -2,9 +2,11 @@ package uk.ac.gla.dcs.bigdata.studentfunctions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.util.LongAccumulator;
@@ -29,17 +31,16 @@ public class NewsArticleQueriesMapper implements MapFunction<NewsArticle, NewsAr
     @Override
     public NewsArticleQueriesMap call(NewsArticle newsArticle) throws Exception {
 
-        NewsArticle newsArt = newsArticle;
         if (processor==null) processor = new TextPreProcessor();
 
         List<Query> queryBroadcastList = queryBroadcast.value();
-        
+        List<NewsArticleQueriesMap> newArticleQueriesMapList = new ArrayList<NewsArticleQueriesMap>();
         /*newsArticle.getContents().forEach(content-> {
             String processedContent = terms2String(processor.process(content.getContent()));
         }); */
         
         List<String> queryTermsFlattened = new ArrayList<String>();
-        Map<String,Long> termFreq = new HashMap<String,Long>();
+        Map<String,Short> termFreq = new HashMap<String,Short>();
 
         queryBroadcastList.forEach(query -> {
             query.getQueryTerms().forEach(queryTerm -> {
@@ -56,10 +57,9 @@ public class NewsArticleQueriesMapper implements MapFunction<NewsArticle, NewsAr
                     }
                 }
             });
-            termFreq.put(term, termFrequencyInCurrentDocumentAcc.value());
+            termFreq.put(term, termFrequencyInCurrentDocumentAcc.value().shortValue());
         });
-
-        return new NewsArticleQueriesMap(newsArt, queryBroadcastList, termFreq);
+        return new NewsArticleQueriesMap(newsArticle, termFreq);
     }
 
 
