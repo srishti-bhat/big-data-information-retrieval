@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.spark.api.java.function.FlatMapFunction;
-import org.apache.spark.api.java.function.MapFunction;
 
 import uk.ac.gla.dcs.bigdata.studentstructures.NewsArticleQueriesMap;
 import uk.ac.gla.dcs.bigdata.studentstructures.TermFrequency;
