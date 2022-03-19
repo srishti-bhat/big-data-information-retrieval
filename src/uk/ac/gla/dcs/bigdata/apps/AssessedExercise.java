@@ -18,8 +18,11 @@ import org.apache.spark.sql.KeyValueGroupedDataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.LongAccumulator;
+import org.apache.spark.util.DoubleAccumulator;
+
 
 import scala.Tuple2;
+import java.util.Collections;
 import uk.ac.gla.dcs.bigdata.providedfunctions.NewsFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedfunctions.QueryFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedstructures.DocumentRanking;
@@ -114,8 +117,6 @@ public class AssessedExercise {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		
 	}
 	
 	public static List<DocumentRanking> rankDocuments(SparkSession spark, String queryFile, String newsFile) {
@@ -142,11 +143,13 @@ public class AssessedExercise {
 		LongAccumulator termFrequencyInCurrentDocumentAcc = spark.sparkContext().longAccumulator();
 		LongAccumulator termFrequencyInCorpus = spark.sparkContext().longAccumulator();
 		LongAccumulator currDocumentLength = spark.sparkContext().longAccumulator();
+		DoubleAccumulator avgScoreAcc = spark.sparkContext().doubleAccumulator();
 
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
 		Dataset<NewsArticle> newsArticles = newsTokenized.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpusAcc), Encoders.bean(NewsArticle.class));
+		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
 
 		Double averageDocumentLengthInCorpus = totalDocumentLengthInCorpusAcc.value() / (1.0 * totalDocsInCorpusAcc.value());
 
@@ -166,7 +169,7 @@ public class AssessedExercise {
 		Broadcast<Double> averageDocumentLengthInCorpusBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(averageDocumentLengthInCorpus);
 		Broadcast<List<Tuple2<String, Integer>>> corpusTermFrequencyFlattenedListBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(corpusTermFrequencyFlattenedList);
 
-		Dataset<DocumentRanking> documentRanking = queries.flatMap(
+		Dataset<DocumentRanking> documentRanking = queries.map(
 			new DPHCalcMapper(
 				queryBroadcast, 
 				newsArticlesQueriesMapListBroadcast,
@@ -174,16 +177,15 @@ public class AssessedExercise {
 				averageDocumentLengthInCorpusBroadcast, 
 				corpusTermFrequencyFlattenedListBroadcast,
 				termFrequencyInCorpus,
-				currDocumentLength
+				currDocumentLength,
+				avgScoreAcc
 				), 
 			Encoders.bean(DocumentRanking.class));
 		
-
 		Dataset<DocumentRanking> documentRankingFinal = documentRanking.map(new RedundancyCheck(), Encoders.bean(DocumentRanking.class));
 		
 		List<DocumentRanking> documentRankingList = documentRankingFinal.collectAsList();
-		
-		return documentRankingList; // replace this with the the list of DocumentRanking output by your topology
+		return documentRankingList; 
 	}
 	
 	
