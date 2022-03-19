@@ -6,7 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.spark.SparkConf;
@@ -26,10 +25,10 @@ import uk.ac.gla.dcs.bigdata.providedfunctions.QueryFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedstructures.DocumentRanking;
 import uk.ac.gla.dcs.bigdata.providedstructures.NewsArticle;
 import uk.ac.gla.dcs.bigdata.providedstructures.Query;
-import uk.ac.gla.dcs.bigdata.providedstructures.RankedResult;
 import uk.ac.gla.dcs.bigdata.studentfunctions.DPHCalcMapper;
 import uk.ac.gla.dcs.bigdata.studentfunctions.DocumentIterator;
 import uk.ac.gla.dcs.bigdata.studentfunctions.NewsArticleQueriesMapper;
+import uk.ac.gla.dcs.bigdata.studentfunctions.RedundancyCheck;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TermFrequencyKeyFunction;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TermFrequencyMapper;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TestTokenize;
@@ -147,9 +146,7 @@ public class AssessedExercise {
 
 		// try a map function
 		Dataset<NewsArticle> newsTokenized = news.map(new TestTokenize(), Encoders.bean(NewsArticle.class));
-
 		Dataset<NewsArticle> newsArticles = newsTokenized.flatMap(new DocumentIterator(totalDocsInCorpusAcc, totalDocumentLengthInCorpusAcc), Encoders.bean(NewsArticle.class));
-		List<NewsArticle> newsArticlesList = newsArticles.collectAsList();
 
 		Double averageDocumentLengthInCorpus = totalDocumentLengthInCorpusAcc.value() / (1.0 * totalDocsInCorpusAcc.value());
 
@@ -160,7 +157,6 @@ public class AssessedExercise {
 		Broadcast<List<NewsArticleQueriesMap>> newsArticlesQueriesMapListBroadcast = JavaSparkContext.fromSparkContext(spark.sparkContext()).broadcast(newsArticlesQueriesMapList);
 
 		Dataset<TermFrequency> corpusTermFrequency = newsArticlesQueriesMap.flatMap(new TermFrequencyMapper(), Encoders.bean(TermFrequency.class));
-		TermFrequencyKeyFunction keyFunction = new TermFrequencyKeyFunction();
 		KeyValueGroupedDataset<String, TermFrequency> corpusTermFrequencyGrouped = corpusTermFrequency.groupByKey(new TermFrequencyKeyFunction(), Encoders.STRING());		
 		Encoder<Tuple2<String,Integer>> termEncoder = Encoders.tuple(Encoders.STRING(), Encoders.INT());
 		Dataset<Tuple2<String, Integer>> corpusTermFrequencyFlattened = corpusTermFrequencyGrouped.mapGroups(new TotalTermCount(), termEncoder);
@@ -181,24 +177,13 @@ public class AssessedExercise {
 				currDocumentLength
 				), 
 			Encoders.bean(DocumentRanking.class));
-		List<DocumentRanking> documentRankingList = documentRanking.collectAsList();
 		
-		// collect some articles
-		List<NewsArticle> first10 = newsTokenized.takeAsList(10);
+
+		Dataset<DocumentRanking> documentRankingFinal = documentRanking.map(new RedundancyCheck(), Encoders.bean(DocumentRanking.class));
 		
-		// create a dummy document ranking manually so we can return something
-		List<RankedResult> results = new ArrayList<RankedResult>(10);
-		for (NewsArticle article : first10) {
-			RankedResult result = new RankedResult(article.getId(), article, 1.0);
-			results.add(result);	
-		}
-		DocumentRanking ranking = new DocumentRanking(queryList.get(0), results);
+		List<DocumentRanking> documentRankingList = documentRankingFinal.collectAsList();
 		
-		// convert to list
-		List<DocumentRanking> rankingList = new ArrayList<DocumentRanking>(1);
-		rankingList.add(ranking);
-		
-		return rankingList; // replace this with the the list of DocumentRanking output by your topology
+		return documentRankingList; // replace this with the the list of DocumentRanking output by your topology
 	}
 	
 	
