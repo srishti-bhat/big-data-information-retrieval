@@ -13,11 +13,14 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoder;
 import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.KeyValueGroupedDataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.LongAccumulator;
 
+import scala.Tuple2;
 import uk.ac.gla.dcs.bigdata.providedfunctions.NewsFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedfunctions.QueryFormaterMap;
 import uk.ac.gla.dcs.bigdata.providedstructures.DocumentRanking;
@@ -26,8 +29,13 @@ import uk.ac.gla.dcs.bigdata.providedstructures.Query;
 import uk.ac.gla.dcs.bigdata.providedstructures.RankedResult;
 import uk.ac.gla.dcs.bigdata.studentfunctions.DocumentIterator;
 import uk.ac.gla.dcs.bigdata.studentfunctions.NewsArticleQueriesMapper;
+import uk.ac.gla.dcs.bigdata.studentfunctions.TermFrequencyKeyFunction;
+import uk.ac.gla.dcs.bigdata.studentfunctions.TermFrequencyMapper;
+import uk.ac.gla.dcs.bigdata.studentfunctions.TermFrequencyReducer;
 import uk.ac.gla.dcs.bigdata.studentfunctions.TestTokenize;
+import uk.ac.gla.dcs.bigdata.studentfunctions.TotalTermCount;
 import uk.ac.gla.dcs.bigdata.studentstructures.NewsArticleQueriesMap;
+import uk.ac.gla.dcs.bigdata.studentstructures.TermFrequency;
 
 /**
  * This is the main class where your Spark topology should be specified.
@@ -152,7 +160,14 @@ public class AssessedExercise {
 		Dataset<NewsArticleQueriesMap> newsArticlesQueriesMap = newsTokenized.map(new NewsArticleQueriesMapper(queryBroadcast, termFrequencyInCurrentDocumentAcc), Encoders.bean(NewsArticleQueriesMap.class));
 		List<NewsArticleQueriesMap> newsArticlesQueriesMapList = newsArticlesQueriesMap.collectAsList();
 		
+		Dataset<TermFrequency> corpusTermFrequency = newsArticlesQueriesMap.flatMap(new TermFrequencyMapper(), Encoders.bean(TermFrequency.class));
+		TermFrequencyKeyFunction keyFunction = new TermFrequencyKeyFunction();
+
+		KeyValueGroupedDataset<String, TermFrequency> corpusTermFrequencyGrouped = corpusTermFrequency.groupByKey(new TermFrequencyKeyFunction(), Encoders.STRING());
 		
+		Encoder<Tuple2<String,Integer>> termEncoder = Encoders.tuple(Encoders.STRING(), Encoders.INT());
+		Dataset<Tuple2<String, Integer>> corpusTermFrequencyFlattened = corpusTermFrequencyGrouped.mapGroups(new TotalTermCount(), termEncoder);
+		List<Tuple2<String, Integer>> corpusTermFrequencyFlattenedList = corpusTermFrequencyFlattened.collectAsList();
 		// collect some articles
 		List<NewsArticle> first10 = newsTokenized.takeAsList(10);
 		

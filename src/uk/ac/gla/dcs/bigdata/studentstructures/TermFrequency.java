@@ -6,9 +6,9 @@ public class TermFrequency implements Serializable {
     private static final long serialVersionUID = 1565312120561246290L;
 
     String term;
-    Integer totalCount;
-    
-    public TermFrequency(String term, Integer totalCount) {
+    Long totalCount;
+
+    public TermFrequency(String term, Long totalCount) {
         this.term = term;
         this.totalCount = totalCount;
     }
@@ -28,11 +28,11 @@ public class TermFrequency implements Serializable {
         this.term = term;
     }
 
-    public Integer getTotalCount() {
+    public Long getTotalCount() {
         return totalCount;
     }
 
-    public void setTotalCount(Integer totalCount) {
+    public void setTotalCount(Long totalCount) {
         this.totalCount = totalCount;
     }
 }
